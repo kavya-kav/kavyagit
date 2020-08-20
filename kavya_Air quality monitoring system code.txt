@@ -1,0 +1,392 @@
+#include <LiquidCrystal.h>
+#include <stdio.h>
+#include <SoftwareSerial.h>
+
+SoftwareSerial mySerial(8, 9);
+
+LiquidCrystal lcd(6, 7, 5, 4, 3, 2);
+ 
+int shifter      = A1;
+
+int hum          = 11;
+int mq9          = 10;
+int mq135        = 12;
+int buzzer       = 13;
+
+void okcheck()
+{
+  unsigned char rcr;
+  do{
+      rcr = Serial.read();
+    }while(rcr != 'K');
+}
+
+void okcheck1()
+{
+  unsigned char rcr;
+  do{
+      rcr = mySerial.read();
+    }while(rcr != 'K');
+}
+
+void things_send()
+{
+unsigned char recr;
+ Serial.write("AT+CIPMUX=1\r\n");delay(2500);
+ Serial.write("AT+CIPSTART=4,\"TCP\",\"184.106.153.149\",80\r\n");delay(4500);          //OK  LINKED
+ Serial.write("AT+CIPSEND=4,73\r\n");  delay(3500); 
+ Serial.write("GET https://api.thingspeak.com/update?api_key=GMAXWP6R1HAB17BD&");
+}
+
+void things_rcv()
+{
+unsigned char recr;
+  mySerial.write("AT+CIPSTART=4,\"TCP\",\"184.106.153.149\",80\r\n");  delay(4000);  
+  mySerial.write("AT+CIPSEND=4,73\r\n");    
+         
+//https://api.thingspeak.com/channels/412507/fields/2.json?results=10000
+ mySerial.write("GET https://api.thingspeak.com/channels/449069/fields/3.json?results=1");//39
+
+}
+
+void things_done()
+{    
+ Serial.write("\r\n\r\n");  delay(4000);
+}
+
+void beep()
+{
+   digitalWrite(buzzer,LOW);delay(2500);digitalWrite(buzzer,HIGH);
+}
+
+
+void setup() 
+{
+ Serial.begin(9600);//serialEvent();
+ mySerial.begin(9600);
+ 
+
+   pinMode(shifter, OUTPUT);
+   pinMode(buzzer, OUTPUT);
+   pinMode(hum, INPUT);
+   pinMode(mq9, INPUT);
+   pinMode(mq135, INPUT);
+
+  
+   digitalWrite(shifter,LOW);
+   digitalWrite(buzzer,HIGH);
+
+   
+  //serialEvent();
+
+   // set up the LCD's number of columns and rows:
+  lcd.begin(16, 2);lcd.cursor();
+  // Print a message to the LCD.
+  lcd.print("Air Quality Measurement");
+
+  delay(2000);
+
+  
+  Serial.write("AT\r\n");         delay(2000);//okcheck();
+  Serial.write("ATE0\r\n");         okcheck();delay(2000);  
+  Serial.write("AT+CWJAP=\"iotserver\",\"iotserver@123\"\r\n"); //        okcheck();
+  okcheck();
+  Serial.write("AT+CIPMUX=1\r\n");delay(3000);//         okcheck();
+ 
+  lcd.clear();
+  lcd.print("Connected");
+  delay(1000);
+
+  gsminit();
+   
+   lcd.clear();
+   lcd.setCursor(0,0);
+   lcd.print("T:");//2,0   
+   lcd.setCursor(8,0);
+   lcd.print("H:");//10-11-12,0   
+   
+   lcd.setCursor(0,1);
+   lcd.print("Q9:");//3,1
+   
+   lcd.setCursor(7,1);
+   lcd.print("Q5:");//10,1
+
+}
+
+
+void loop() 
+{   
+        tempc = analogRead(A0);
+        tempc = (tempc*0.48828125);
+        lcd.setCursor(2,0);convertl(tempc);    delay(100);
+    if(tempc > 45)
+      {
+       beep();
+       
+    mySerial.write("AT+CMGS=\"");
+    mySerial.write(pastnumber);
+    mySerial.write("\"\r\n"); delay(3000);
+    mySerial.write("High Temp:");converts1(tempc);
+    mySerial.write(0x1A);      
+
+    things_send();
+    Serial.write("field1=");converts(tempc);
+    things_done();
+    for(rtr1=0;rtr1<35;rtr1++){lcd.setCursor(13,1);convertl(rtr1);delay(850);}
+    lcd.setCursor(13,1);lcd.print("   ");
+    
+       digitalWrite(shifter,HIGH);
+       delay(2000);
+       mySerial.write("High Temp:");converts1(tempc);mySerial.write("\r\n");
+       digitalWrite(shifter,LOW);
+       delay(1000);
+      }
+    
+   if(digitalRead(hum) == LOW)
+     {
+      lcd.setCursor(10,0);lcd.print("ON ");
+      
+       beep();
+       
+    mySerial.write("AT+CMGS=\"");
+    mySerial.write(pastnumber);
+    mySerial.write("\"\r\n"); delay(3000);
+    mySerial.write("Hum ON\r\n");
+    mySerial.write(0x1A);      
+
+    things_send();
+    Serial.write("field2=00100");//converts(tempc);
+    things_done();
+    for(rtr1=0;rtr1<35;rtr1++){lcd.setCursor(13,1);convertl(rtr1);delay(850);}
+    lcd.setCursor(13,1);lcd.print("   ");
+       digitalWrite(shifter,HIGH);
+       delay(2000);
+       mySerial.write("High Hum\r\n");//converts1(tempc);
+       digitalWrite(shifter,LOW);
+       delay(1000);
+     }
+   if(digitalRead(hum) == HIGH)
+     {
+      lcd.setCursor(10,0);lcd.print("OFF");
+     }
+
+
+   
+   if(digitalRead(mq9) == LOW)
+     {
+      lcd.setCursor(3,1);lcd.print("ON ");
+      beep();
+      
+       beep();
+       
+    mySerial.write("AT+CMGS=\"");
+    mySerial.write(pastnumber);
+    mySerial.write("\"\r\n"); delay(3000);
+    mySerial.write("Mq9:High");//converts1(tempc);
+    mySerial.write(0x1A);      
+
+    things_send();
+    Serial.write("field3=00100");//converts(tempc);
+    things_done();
+    for(rtr1=0;rtr1<35;rtr1++){lcd.setCursor(13,1);convertl(rtr1);delay(850);}
+   lcd.setCursor(13,1);lcd.print("   ");
+       digitalWrite(shifter,HIGH);
+       delay(2000);
+       mySerial.write("mq9:High\r\n");//converts1(tempc);
+       digitalWrite(shifter,LOW);
+       delay(1000);
+     }
+   if(digitalRead(mq9) == HIGH)
+     {
+      lcd.setCursor(3,1);lcd.print("OFF");
+     }
+
+
+
+   
+   if(digitalRead(mq135) == LOW)
+     {
+      lcd.setCursor(10,1);lcd.print("ON ");
+      beep();
+      
+       
+    mySerial.write("AT+CMGS=\"");
+    mySerial.write(pastnumber);
+    mySerial.write("\"\r\n"); delay(3000);
+    mySerial.write("Mq135:High");//converts1(tempc);
+    mySerial.write(0x1A);      
+
+    things_send();
+    Serial.write("field4=00100");//converts(tempc);
+    things_done();
+    for(rtr1=0;rtr1<35;rtr1++){lcd.setCursor(13,1);convertl(rtr1);delay(850);}
+    lcd.setCursor(13,1);lcd.print("   ");
+       digitalWrite(shifter,HIGH);
+       delay(2000);
+       mySerial.write("Mq135:High\r\n");//converts1(tempc);
+       digitalWrite(shifter,LOW);
+       delay(1000);
+     }
+   if(digitalRead(mq135) == HIGH)
+     {
+      lcd.setCursor(10,1);lcd.print("OFF");
+     }
+}
+
+
+
+
+
+void wifiinit()
+{
+  Serial.write("AT\r\n");                   delay(3000);
+  Serial.write("ATE0\r\n");                 okcheck();
+  Serial.write("AT+CIPMUX=1\r\n");          delay(3000);
+  Serial.write("AT+CIPSERVER=1,23\r\n");    
+    
+  lcd.clear();
+  lcd.print("Waiting For");
+  lcd.setCursor(0,1);
+  lcd.print("Connection");  
+  do{
+     rcv = Serial.read();
+    }while(rcv != 'L');
+    
+  lcd.clear();
+  lcd.print("Connected");
+  delay(1000);
+}
+
+void gsminit()
+{
+  mySerial.write("AT\r\n");                   okcheck1();
+  mySerial.write("ATE0\r\n");                 okcheck1();
+  mySerial.write("AT+CMGF=1\r\n");            okcheck1();
+  mySerial.write("AT+CNMI=1,2,0,0\r\n");      okcheck1();
+  mySerial.write("AT+CSMP=17,167,0,0\r\n");   okcheck1();
+    
+  lcd.clear();
+  lcd.print("SEND MSG STORE");
+  lcd.setCursor(0,1);
+  lcd.print("MOBILE NUMBER");  
+  do{
+     rcv = mySerial.read();
+    }while(rcv != '*');
+     readSerial(pastnumber);
+     
+  lcd.clear();
+  lcd.print(pastnumber);
+pastnumber[10]='\0';
+
+    mySerial.write("AT+CMGS=\"");
+    mySerial.write(pastnumber);
+    mySerial.write("\"\r\n"); delay(3000);
+    mySerial.write("Mobile no. registered\r\n");
+    mySerial.write(0x1A);     delay(4000);delay(4000);  
+    
+  //delay(1000);
+}
+
+int gpsgain(char result[]) 
+{
+  int i = 0;
+  char rcvv;
+  
+  while (1) 
+  {
+    while (Serial.available() > 0) 
+    {   
+      lp:
+      char inChar = Serial.read();
+      result[i] = inChar;
+      if(result[0] == '$')
+        {
+          i++;
+       //   result[i] = inChar;
+        }
+      if(result[0] != '$')
+        {
+          i=0; 
+        }
+      if(i == 5)
+        {
+         if(result[0] == '$' && result[1] == 'G' && result[2] == 'P' && result[3] == 'R' && result[4] == 'M' && result[5] == 'C')
+           {
+             goto lp;   
+           }
+         else
+           {
+            i=0;  
+           }
+        }
+      if(i == 46)
+        {
+            result[47] = '\0';
+            Serial.flush();
+            
+            lt[0]=result[21];lt[1]=result[22];lt[2]=result[23];lt[3]=result[24];lt[4]=result[25];lt[5]=result[26];
+            lt[6]=result[27];lt[7]=result[28];lt[8]=result[29];lt[9]=result[30];lt[10]=result[31];lt[11]='\0';
+
+            ln[0]=result[33];ln[1]=result[34];ln[2]=result[35];ln[3]=result[36];ln[4]=result[37];ln[5]=result[38];
+            ln[6]=result[39];ln[7]=result[40];ln[8]=result[41];ln[9]=result[42];ln[10]=result[43];ln[11]=result[44];ln[12]='\0';
+            
+            return 0;
+        }
+    }
+  }
+}
+
+
+
+
+void converts1(unsigned int value)
+{
+  unsigned int a,b,c,d,e,f,g,h;
+
+      a=value/10000;
+      b=value%10000;
+      c=b/1000;
+      d=b%1000;
+      e=d/100;
+      f=d%100;
+      g=f/10;
+      h=f%10;
+
+
+      a=a|0x30;               
+      c=c|0x30;
+      e=e|0x30; 
+      g=g|0x30;              
+      h=h|0x30;
+    
+     
+   mySerial.write(a);
+   mySerial.write(c);
+   mySerial.write(e); 
+   mySerial.write(g);
+   mySerial.write(h);
+}
+
+
+void convertk(unsigned int value)
+{
+  unsigned int a,b,c,d,e,f,g,h;
+
+      a=value/10000;
+      b=value%10000;
+      c=b/1000;
+      d=b%1000;
+      e=d/100;
+      f=d%100;
+      g=f/10;
+      h=f%10;
+
+
+      a=a|0x30;               
+      c=c|0x30;
+      e=e|0x30; 
+      g=g|0x30;              
+      h=h|0x30;
+}
+
+
